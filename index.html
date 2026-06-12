@@ -715,7 +715,7 @@ function fetchLiveScores() {
   // openfootball: free, no key, CORS enabled via raw.githubusercontent.com
   // Score format: match.score.ft = [home, away]
   var URLS = [
-    'https://worldcup26.ir/get/games',
+    'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026/worldcup.json',
     'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json'
   ];
 
@@ -734,12 +734,6 @@ function fetchLiveScores() {
   function norm(n){ return (nameMap[n] || n).toLowerCase().slice(0,6); }
 
   function tryFetch(urlIndex) {
-    if (urlIndex >= URLS.length) {
-      var el = document.getElementById('last-updated');
-      if (el) el.textContent = 'Refresh failed \u00b7 try again later';
-      if (btn) { btn.disabled = false; btn.textContent = '\u21ba Refresh'; }
-      return;
-    }
     fetch(URLS[urlIndex])
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -747,25 +741,13 @@ function fetchLiveScores() {
       })
       .then(function(data) {
         var updated = 0;
-        // Detect format: worldcup26.ir returns array, openfootball returns {matches:[]}
-        var matches = Array.isArray(data) ? data : (data.matches || []);
-        var isWC26 = Array.isArray(data);
+        var matches = data.matches || [];
 
         matches.forEach(function(om) {
-          var s, oh, oa;
-          if (isWC26) {
-            // worldcup26.ir format: {home_team, away_team, home_score, away_score}
-            if (om.home_score === null || om.home_score === undefined) return;
-            s = [om.home_score, om.away_score];
-            oh = norm(om.home_team || om.home || '');
-            oa = norm(om.away_team || om.away || '');
-          } else {
-            // openfootball format: {team1, team2, score:{ft:[h,a]}}
-            if (!om.score || !om.score.ft) return;
-            s = om.score.ft;
-            oh = norm(om.team1); oa = norm(om.team2);
-          }
-          var dummy = oh; // suppress lint
+          // openfootball format: {team1, team2, score:{ft:[h,a]}}
+          if (!om.score || !om.score.ft) return;
+          var s = om.score.ft;
+          var oh = norm(om.team1), oa = norm(om.team2);
           var match = WC.find(function(f) {
             return norm(f.home) === oh && norm(f.away) === oa;
           });
@@ -811,7 +793,15 @@ function fetchLiveScores() {
         updateEnglandCountdown();
         updateNextMatchPanel();
       })
-      .catch(function() { tryFetch(urlIndex + 1); });
+      .catch(function(err) {
+        if (urlIndex + 1 < URLS.length) {
+          tryFetch(urlIndex + 1);
+        } else {
+          var el = document.getElementById('last-updated');
+          if (el) el.textContent = 'Refresh failed: ' + (err.message || 'network error');
+          if (btn) { btn.disabled = false; btn.textContent = '\u21ba Refresh'; }
+        }
+      });
   }
 
   tryFetch(0);
