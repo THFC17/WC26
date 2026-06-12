@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fetch Test</title>
+<style>
+body{font-family:monospace;background:#111;color:#0f0;padding:16px;font-size:13px;white-space:pre-wrap;word-break:break-all}
+.err{color:#f55}
+.ok{color:#5f5}
+button{padding:10px 16px;font-size:14px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<button onclick="run()">Run Test</button>
+<div id="out">Tap "Run Test"</div>
+
+<script>
+var URLS = [
+  'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026/worldcup.json',
+  'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json'
+];
+
+function log(msg, cls) {
+  var out = document.getElementById('out');
+  var line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  out.appendChild(line);
+}
+
+function run() {
+  document.getElementById('out').innerHTML = '';
+  log('Starting test at ' + new Date().toISOString());
+  log('User agent: ' + navigator.userAgent);
+  log('');
+
+  URLS.forEach(function(url, i) {
+    log('--- URL ' + (i+1) + ': ' + url + ' ---');
+    fetch(url)
+      .then(function(r) {
+        log('  Response received. status=' + r.status + ' ok=' + r.ok, r.ok ? 'ok' : 'err');
+        log('  content-type=' + r.headers.get('content-type'));
+        log('  access-control-allow-origin=' + r.headers.get('access-control-allow-origin'));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(text) {
+        log('  Body length: ' + text.length + ' chars', 'ok');
+        try {
+          var data = JSON.parse(text);
+          log('  JSON parsed OK. matches: ' + (data.matches ? data.matches.length : 'NO matches key'), 'ok');
+          if (data.matches) {
+            var scored = data.matches.filter(function(m){ return m.score && m.score.ft; });
+            log('  Matches with scores: ' + scored.length, 'ok');
+            scored.slice(0,3).forEach(function(m) {
+              log('    ' + m.team1 + ' ' + m.score.ft[0] + '-' + m.score.ft[1] + ' ' + m.team2);
+            });
+          }
+        } catch(e) {
+          log('  JSON.parse FAILED: ' + e.message, 'err');
+          log('  First 200 chars: ' + text.slice(0,200));
+        }
+      })
+      .catch(function(e) {
+        log('  FETCH FAILED: ' + e.name + ': ' + e.message, 'err');
+      })
+      .finally(function() {
+        log('');
+      });
+  });
+}
+</script>
+</body>
+</html>
